@@ -7,8 +7,10 @@ on:
       - "profchana-cloud-build-v1.0-2.zip"
       - ".github/workflows/build-apk.yml"
 
+
 jobs:
   build:
+
     runs-on: ubuntu-latest
 
     steps:
@@ -17,72 +19,86 @@ jobs:
         uses: actions/checkout@v4
 
 
-      - name: Extrair projeto
+      - name: Extrair projeto ZIP
         run: |
           mkdir projeto
           unzip -q "profchana-cloud-build-v1.0-2.zip" -d projeto
 
+          echo "Arquivos extraídos:"
+          find projeto -maxdepth 3 -type d
 
-      - name: Encontrar Android
+
+      - name: Encontrar projeto Android
         run: |
-          GRADLE=$(find projeto -name gradlew | head -1)
+
+          GRADLE=$(find projeto -type f -name gradlew | head -1)
 
           if [ -z "$GRADLE" ]; then
-            echo "Gradlew não encontrado"
+            echo "ERRO: gradlew não encontrado"
+            find projeto -type f
             exit 1
           fi
 
           ANDROID_DIR=$(dirname "$GRADLE")
 
+          echo "Android encontrado:"
+          echo "$ANDROID_DIR"
+
           echo "ANDROID_DIR=$ANDROID_DIR" >> $GITHUB_ENV
 
 
-      - name: Corrigir configuração JVM
+
+      - name: Diagnosticar arquivos Gradle
         working-directory: ${{ env.ANDROID_DIR }}
         run: |
 
-          echo "Procurando build.gradle..."
+          echo "=========================="
+          echo "ARQUIVOS GRADLE"
+          echo "=========================="
 
-          find . -name "build.gradle"
-
-          if [ -f app/build.gradle ]; then
-
-            echo "Adicionando configuração Java 17"
-
-            cat >> app/build.gradle <<'EOF'
-
-android {
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
-    }
-}
-
-tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-}
-
-EOF
-
-          fi
+          find . \
+          \( -name "build.gradle" \
+          -o -name "build.gradle.kts" \
+          -o -name "gradle.properties" \)
 
 
-      - name: Dar permissão Gradle
+          echo ""
+          echo "=========================="
+          echo "ESTRUTURA APP"
+          echo "=========================="
+
+          ls -la
+
+          echo ""
+
+          ls -la app || true
+
+
+
+      - name: Dar permissão ao Gradle
         run: |
           chmod +x "$ANDROID_DIR/gradlew"
 
 
-      - name: Configurar Java
+
+      - name: Configurar Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
 
+
       - name: Configurar Gradle
         uses: gradle/actions/setup-gradle@v4
+
+
+
+      - name: Verificar versão Java
+        run: |
+          java -version
+          echo $JAVA_HOME
+
 
 
       - name: Gerar APK Debug
@@ -91,8 +107,13 @@ EOF
           ./gradlew assembleDebug --stacktrace
 
 
+
       - name: Publicar APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
+
           name: profchana-apk-teste
-          path: ${{ env.ANDROID_DIR }}/app/build/outputs/apk/debug/app-debug.apk
+
+          path: |
+            ${{ env.ANDROID_DIR }}/app/build/outputs/apk/debug/*.apk

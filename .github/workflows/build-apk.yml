@@ -37,12 +37,44 @@ jobs:
           echo "ANDROID_DIR=$ANDROID_DIR" >> $GITHUB_ENV
 
 
+      - name: Corrigir configuração JVM
+        working-directory: ${{ env.ANDROID_DIR }}
+        run: |
+
+          echo "Procurando build.gradle..."
+
+          find . -name "build.gradle"
+
+          if [ -f app/build.gradle ]; then
+
+            echo "Adicionando configuração Java 17"
+
+            cat >> app/build.gradle <<'EOF'
+
+android {
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+}
+
+EOF
+
+          fi
+
+
       - name: Dar permissão Gradle
         run: |
           chmod +x "$ANDROID_DIR/gradlew"
 
 
-      - name: Configurar Java 17
+      - name: Configurar Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -51,12 +83,6 @@ jobs:
 
       - name: Configurar Gradle
         uses: gradle/actions/setup-gradle@v4
-
-
-      - name: Forçar Java 17
-        working-directory: ${{ env.ANDROID_DIR }}
-        run: |
-          echo "org.gradle.java.home=$JAVA_HOME" >> gradle.properties
 
 
       - name: Gerar APK Debug

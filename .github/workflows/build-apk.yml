@@ -1,1 +1,60 @@
+name: Gerar APK Profchana
 
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "profchana-cloud-build-v1.0-2.zip"
+      - ".github/workflows/build-apk.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar projeto
+        uses: actions/checkout@v4
+
+      - name: Preparar ZIP
+        run: |
+          mkdir projeto
+          unzip -q "profchana-cloud-build-v1.0-2.zip" -d projeto
+          echo "Conteúdo extraído:"
+          find projeto -maxdepth 4 -type f | head -100
+
+      - name: Encontrar projeto Android
+        run: |
+          GRADLEW=$(find projeto -type f -name gradlew | head -1)
+
+          if [ -z "$GRADLEW" ]; then
+            echo "ERRO: gradlew não encontrado."
+            echo "Estrutura encontrada:"
+            find projeto -maxdepth 5 -type f
+            exit 1
+          fi
+
+          ANDROID_DIR=$(dirname "$GRADLEW")
+          echo "Projeto Android encontrado em: $ANDROID_DIR"
+          echo "ANDROID_DIR=$ANDROID_DIR" >> "$GITHUB_ENV"
+
+      - name: Dar permissão ao Gradle
+        run: chmod +x "$ANDROID_DIR/gradlew"
+
+      - name: Configurar Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Configurar Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Gerar APK Debug
+        working-directory: ${{ env.ANDROID_DIR }}
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Publicar APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: profchana-apk-teste
+          path: "${{ env.ANDROID_DIR }}/app/build/outputs/apk/debug/app-debug.apk"

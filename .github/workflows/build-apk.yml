@@ -9,6 +9,7 @@ on:
 
 
 jobs:
+
   build:
 
     runs-on: ubuntu-latest
@@ -24,58 +25,56 @@ jobs:
           mkdir projeto
           unzip -q "profchana-cloud-build-v1.0-2.zip" -d projeto
 
-          echo "Arquivos extraídos:"
-          find projeto -maxdepth 3 -type d
 
-
-      - name: Encontrar projeto Android
+      - name: Encontrar Android
         run: |
 
-          GRADLE=$(find projeto -type f -name gradlew | head -1)
+          GRADLE=$(find projeto -name gradlew | head -1)
 
           if [ -z "$GRADLE" ]; then
-            echo "ERRO: gradlew não encontrado"
-            find projeto -type f
+            echo "Gradlew não encontrado"
             exit 1
           fi
 
           ANDROID_DIR=$(dirname "$GRADLE")
 
-          echo "Android encontrado:"
-          echo "$ANDROID_DIR"
-
           echo "ANDROID_DIR=$ANDROID_DIR" >> $GITHUB_ENV
 
 
 
-      - name: Diagnosticar arquivos Gradle
+      - name: Corrigir JVM Kotlin
         working-directory: ${{ env.ANDROID_DIR }}
         run: |
 
-          echo "=========================="
-          echo "ARQUIVOS GRADLE"
-          echo "=========================="
+          echo "Corrigindo app/build.gradle.kts"
 
-          find . \
-          \( -name "build.gradle" \
-          -o -name "build.gradle.kts" \
-          -o -name "gradle.properties" \)
+          cat >> app/build.gradle.kts <<'EOF'
 
 
-          echo ""
-          echo "=========================="
-          echo "ESTRUTURA APP"
-          echo "=========================="
+android {
 
-          ls -la
+    compileOptions {
 
-          echo ""
+        sourceCompatibility = JavaVersion.VERSION_17
 
-          ls -la app || true
+        targetCompatibility = JavaVersion.VERSION_17
+
+    }
+
+}
+
+
+kotlin {
+
+    jvmToolchain(17)
+
+}
+
+EOF
 
 
 
-      - name: Dar permissão ao Gradle
+      - name: Dar permissão Gradle
         run: |
           chmod +x "$ANDROID_DIR/gradlew"
 
@@ -94,13 +93,6 @@ jobs:
 
 
 
-      - name: Verificar versão Java
-        run: |
-          java -version
-          echo $JAVA_HOME
-
-
-
       - name: Gerar APK Debug
         working-directory: ${{ env.ANDROID_DIR }}
         run: |
@@ -115,5 +107,4 @@ jobs:
 
           name: profchana-apk-teste
 
-          path: |
-            ${{ env.ANDROID_DIR }}/app/build/outputs/apk/debug/*.apk
+          path: ${{ env.ANDROID_DIR }}/app/build/outputs/apk/debug/*.apk

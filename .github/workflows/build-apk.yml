@@ -12,8 +12,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
       - name: Baixar projeto
         uses: actions/checkout@v4
+
 
       - name: Preparar ZIP
         run: |
@@ -22,23 +24,30 @@ jobs:
           echo "Conteúdo extraído:"
           find projeto -maxdepth 4 -type f | head -100
 
+
       - name: Encontrar projeto Android
         run: |
-          GRADLEW=$(find projeto -type f -name gradlew | head -1)
+          GRADLE=$(find projeto -type f -name gradlew | head -1)
 
-          if [ -z "$GRADLEW" ]; then
+          if [ -z "$GRADLE" ]; then
             echo "ERRO: gradlew não encontrado."
             echo "Estrutura encontrada:"
             find projeto -maxdepth 5 -type f
             exit 1
           fi
 
-          ANDROID_DIR=$(dirname "$GRADLEW")
-          echo "Projeto Android encontrado em: $ANDROID_DIR"
-          echo "ANDROID_DIR=$ANDROID_DIR" >> "$GITHUB_ENV"
+          ANDROID_DIR=$(dirname "$GRADLE")
+
+          echo "Projeto Android encontrado em:"
+          echo $ANDROID_DIR
+
+          echo "ANDROID_DIR=$ANDROID_DIR" >> $GITHUB_ENV
+
 
       - name: Dar permissão ao Gradle
-        run: chmod +x "$ANDROID_DIR/gradlew"
+        run: |
+          chmod +x "$ANDROID_DIR/gradlew"
+
 
       - name: Configurar Java
         uses: actions/setup-java@v4
@@ -46,15 +55,48 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+
       - name: Configurar Gradle
         uses: gradle/actions/setup-gradle@v4
 
+
+      - name: Ajustar JVM para Java 17
+        working-directory: ${{ env.ANDROID_DIR }}
+        run: |
+          echo "org.gradle.java.home=$JAVA_HOME" >> gradle.properties
+
+
+      - name: Corrigir alvo JVM Kotlin
+        working-directory: ${{ env.ANDROID_DIR }}
+        run: |
+          if [ -f app/build.gradle ]; then
+            echo "Aplicando ajuste Kotlin JVM 17"
+
+            cat >> app/build.gradle <<'EOF'
+
+android {
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+}
+EOF
+
+          fi
+
+
       - name: Gerar APK Debug
         working-directory: ${{ env.ANDROID_DIR }}
-        run: ./gradlew assembleDebug --stacktrace
+        run: |
+          ./gradlew assembleDebug --stacktrace
+
 
       - name: Publicar APK
         uses: actions/upload-artifact@v4
         with:
           name: profchana-apk-teste
-          path: "${{ env.ANDROID_DIR }}/app/build/outputs/apk/debug/app-debug.apk"
+          path: ${{ env.ANDROID_DIR }}/app/build/outputs/apk/debug/app-debug.apk

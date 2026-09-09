@@ -7,9 +7,7 @@ on:
       - "profchana-cloud-build-v1.0-2.zip"
       - ".github/workflows/build-apk.yml"
 
-
 jobs:
-
   build:
 
     runs-on: ubuntu-latest
@@ -28,7 +26,6 @@ jobs:
 
       - name: Encontrar Android
         run: |
-
           GRADLE=$(find projeto -name gradlew | head -1)
 
           if [ -z "$GRADLE" ]; then
@@ -41,43 +38,22 @@ jobs:
           echo "ANDROID_DIR=$ANDROID_DIR" >> $GITHUB_ENV
 
 
-
-      - name: Corrigir JVM Kotlin
+      - name: Ajustar Gradle Kotlin
         working-directory: ${{ env.ANDROID_DIR }}
         run: |
+          echo "Corrigindo configuração"
 
-          echo "Corrigindo app/build.gradle.kts"
+          sed -i 's/JavaVersion.VERSION_1_8/JavaVersion.VERSION_17/g' app/build.gradle.kts || true
 
-          cat >> app/build.gradle.kts <<'EOF'
-
-
-android {
-
-    compileOptions {
-
-        sourceCompatibility = JavaVersion.VERSION_17
-
-        targetCompatibility = JavaVersion.VERSION_17
-
-    }
-
-}
-
-
-kotlin {
-
-    jvmToolchain(17)
-
-}
-
-EOF
-
+          echo "" >> app/build.gradle.kts
+          echo "kotlin {" >> app/build.gradle.kts
+          echo "    jvmToolchain(17)" >> app/build.gradle.kts
+          echo "}" >> app/build.gradle.kts
 
 
       - name: Dar permissão Gradle
         run: |
           chmod +x "$ANDROID_DIR/gradlew"
-
 
 
       - name: Configurar Java 17
@@ -87,10 +63,8 @@ EOF
           java-version: "17"
 
 
-
       - name: Configurar Gradle
         uses: gradle/actions/setup-gradle@v4
-
 
 
       - name: Gerar APK Debug
@@ -99,12 +73,9 @@ EOF
           ./gradlew assembleDebug --stacktrace
 
 
-
       - name: Publicar APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
-
           name: profchana-apk-teste
-
           path: ${{ env.ANDROID_DIR }}/app/build/outputs/apk/debug/*.apk
